@@ -4,39 +4,35 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
-    
+
 jobs:
   build-and-publish:
-    name: build and publish
     runs-on: ubuntu-latest
-  
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v2
 
     - name: Set up Java
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v2
       with:
         distribution: 'adopt'
         java-version: '11'
-      
 
-    - name: Run Maven and Create Dockerfile
+    - name: Generate Release Version
+      run: echo "RELEASE_VERSION-5($(mvn help:evaluate -Dexpression=project.version -q -DforceStdout))" | sed 's/-SNAPSHOT//'
+
+    - name: Create Dockerfile
       run: |
-        echo "RELEASE_VERSION-5(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" | sed 's/-SNAPSHOT//'
-        cat > Dockerfile << EOL
+        cat << EOL > Dockerfile
         FROM ghcr.io/usps/ptr2/base-images/akka-builder-consumer:6.0.8
-        WORKDIR ${{ vars.WORKING_DIRECTORY }}/systemtest-restapi/target
+        WORKDIR ${{ env.WORKING_DIRECTORY }}/systemtest-restapi/target
         EOL
 
     - name: Build, Scan, and Publish Container Image
       uses: usps/fast-track-container-image-action@v1.0.0
       with:
-        registry: ${{ vars.CONTAINER_REGISTRY }}
+        registry: ${{ secrets.CONTAINER_REGISTRY }}
         username: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
         password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
         version: 0.2.0
@@ -45,9 +41,7 @@ jobs:
         file: Dockerfile
         severity-cutoff: critical
         workflow: CD
-        
+
     - name: List Docker Images
       run: docker images
-      if: always()
-
-        
+      if: always()
